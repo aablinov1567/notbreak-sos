@@ -12,6 +12,7 @@
     --white: #ffffff;
     --soft: rgba(255, 255, 255, 0.82);
     --line: rgba(255, 255, 255, 0.35);
+    --card: rgba(0, 0, 0, 0.16);
     --pad-top: max(env(safe-area-inset-top), var(--tg-content-safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px));
     --pad-bottom: max(env(safe-area-inset-bottom), var(--tg-safe-area-inset-bottom, 0px));
   }
@@ -28,7 +29,7 @@
     display: none;
     min-height: var(--tg-viewport-stable-height, 100vh);
     padding: calc(var(--pad-top) + 24px) 20px calc(var(--pad-bottom) + 24px);
-    flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+    flex-direction: column; align-items: center; justify-content: center; gap: 20px;
     text-align: center;
   }
   .screen.on { display: flex; }
@@ -48,11 +49,18 @@
   .btn.white { background: var(--white); color: var(--red); }
   .btn.ghost { background: transparent; color: var(--white); border: 2px solid var(--white); }
   .btn.small { min-height: 52px; font-size: 17px; font-weight: 600; }
+  .btn:disabled { opacity: 0.6; }
   .stack { display: flex; flex-direction: column; gap: 12px; width: 100%; align-items: center; }
   .big { font-size: 72px; line-height: 1; }
-  .hot { background: rgba(0, 0, 0, 0.18); border-radius: 16px; padding: 14px 16px; text-align: left; max-width: 360px; width: 100%; }
+  .hot, .card { background: var(--card); border-radius: 16px; padding: 14px 16px; text-align: left; max-width: 360px; width: 100%; }
   .hot a { color: var(--white); font-weight: 700; text-decoration: none; }
-  .hot div + div { margin-top: 8px; }
+  .hot div + div, .card div + div { margin-top: 8px; }
+  .card:empty { display: none; }
+  .muted { color: var(--soft); }
+  .steps { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--soft); }
+  .steps i { width: 28px; height: 6px; border-radius: 3px; background: var(--line); }
+  .steps i.on { background: var(--white); }
+  .note { font-size: 15px; }
   .spinner { width: 56px; height: 56px; border-radius: 50%; border: 6px solid var(--line); border-top-color: var(--white); animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .ring .bar.run { transition: none; } .spinner { animation-duration: 2s; } }
@@ -60,7 +68,8 @@
 </head>
 <body>
 
-<!-- Отсчёт -->
+<!-- ═══ Тревога с иконки ═══ -->
+
 <section class="screen" id="countdown">
   <h1>Сигнал близким уйдёт через</h1>
   <button class="ring" id="ring" aria-label="Отправить сейчас">
@@ -71,13 +80,11 @@
   <button class="btn ghost" id="cancel">Отменить</button>
 </section>
 
-<!-- Отправка -->
 <section class="screen" id="sending">
   <div class="spinner" aria-hidden="true"></div>
   <h1>Отправляю сигнал…</h1>
 </section>
 
-<!-- Готово -->
 <section class="screen" id="done">
   <div class="big">✅</div>
   <h1>Ты не один на один с этим</h1>
@@ -86,7 +93,6 @@
   <button class="btn white" id="openChat">Открыть шаги</button>
 </section>
 
-<!-- Ошибка -->
 <section class="screen" id="error">
   <h1>Не получилось отправить сигнал</h1>
   <p>Нажми красную кнопку 🆘 в чате с ботом или позвони:</p>
@@ -100,7 +106,6 @@
   </div>
 </section>
 
-<!-- Отменено -->
 <section class="screen" id="cancelled">
   <h1>Отменено</h1>
   <p>Если всё-таки тяжело — отправь сигнал. Лишний сигнал лучше срыва.</p>
@@ -110,15 +115,51 @@
   </div>
 </section>
 
-<!-- Иконка на рабочий стол -->
-<section class="screen" id="setup">
+<!-- ═══ Настройка ═══ -->
+
+<section class="screen" id="obAddiction">
+  <div class="steps"><i class="on"></i><i></i><i></i>&nbsp;Шаг 1 из 3</div>
+  <h1>С чем ты борешься?</h1>
+  <p>Чтобы советы в трудную минуту были про твою ситуацию.</p>
+  <div class="stack">
+    <button class="btn white" data-addiction="drugs">💊 Наркотики</button>
+    <button class="btn white" data-addiction="gambling">🎰 Азартные игры и ставки</button>
+    <button class="btn ghost small" id="addSkip">Пропустить</button>
+  </div>
+</section>
+
+<section class="screen" id="obPeople">
+  <div class="steps" id="peopleSteps"><i class="on"></i><i class="on"></i><i></i>&nbsp;Шаг 2 из 3</div>
+  <h1>Кто будет рядом?</h1>
+  <p>Позови 1–3 человек, которым доверяешь. Им придёт карточка с кнопкой «Буду рядом», а если станет тяжело — твой сигнал.</p>
+  <div class="card" id="peopleList"></div>
+  <div class="stack">
+    <button class="btn white" id="invite">💚 Позвать близкого</button>
+    <button class="btn ghost small" id="peopleNext">Пропустить пока</button>
+  </div>
+</section>
+
+<section class="screen" id="obIcon">
+  <div class="steps"><i class="on"></i><i class="on"></i><i class="on"></i>&nbsp;Шаг 3 из 3</div>
   <div class="big">📲</div>
   <h1>Кнопка SOS на рабочем столе</h1>
-  <p>Иконка появится рядом с другими приложениями. Одно нажатие — отсчёт 3 секунды — и близкие получают сигнал. Если нажато случайно, можно отменить.</p>
-  <p id="setupNote" hidden></p>
+  <p>Одно нажатие на иконку — отсчёт 3 секунды — и близкие получают сигнал. Случайное нажатие можно отменить.</p>
+  <p class="note" id="iconNote" hidden></p>
   <div class="stack">
-    <button class="btn white" id="addHome">Добавить на рабочий стол</button>
-    <button class="btn ghost small" id="setupClose">Закрыть</button>
+    <button class="btn white" id="iconAdd">Добавить на рабочий стол</button>
+    <button class="btn ghost small" id="iconNext">Пропустить</button>
+  </div>
+</section>
+
+<section class="screen" id="obDone">
+  <div class="big">🎉</div>
+  <h1>Готово. Теперь есть кому помочь.</h1>
+  <div class="card" id="summary"></div>
+  <p class="note" id="doneNote" hidden></p>
+  <div class="stack">
+    <button class="btn white" id="test" hidden>🧪 Тренировочный сигнал</button>
+    <button class="btn ghost small" id="phone" hidden>📱 Добавить номер телефона</button>
+    <button class="btn ghost small" id="obClose">Закрыть</button>
   </div>
 </section>
 
@@ -132,13 +173,28 @@
   const show = (id) => document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("on", s.id === id));
   const haptic = (kind, arg) => { try { tg.HapticFeedback[kind](arg); } catch (_) {} };
   const supports = (v) => !!tg && tg.isVersionAtLeast && tg.isVersionAtLeast(v);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  async function api(op, extra) {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: JSON.stringify(Object.assign({ initData: tg.initData, op }, extra || {})),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "failed");
+    if (data.bot) bot = data.bot;
+    return data;
+  }
+  const quiet = (op, extra) => api(op, extra).catch(() => null);
 
   function openChat() {
     try { tg.openTelegramLink("https://t.me/" + bot); } catch (_) {}
     setTimeout(() => { try { tg.close(); } catch (_) {} }, 400);
   }
 
-  // ── Отсчёт ───────────────────────────────────────────────────────
+  // ═══ Тревога с иконки ═══════════════════════════════════════════
+
   let timer = null;
   let sent = false;
 
@@ -165,18 +221,6 @@
     timer = null;
   }
 
-  // ── Отправка ─────────────────────────────────────────────────────
-  async function post() {
-    const res = await fetch(API, {
-      method: "POST",
-      headers: { "content-type": "text/plain" },
-      body: JSON.stringify({ initData: tg.initData }),
-    });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || "failed");
-    return data;
-  }
-
   async function sendAlarm() {
     if (sent) return;
     sent = true;
@@ -184,7 +228,7 @@
     show("sending");
     let data = null;
     for (let attempt = 0; attempt < 3 && !data; attempt++) {
-      try { data = await post(); } catch (_) { await new Promise((r) => setTimeout(r, 800)); }
+      try { data = await api("alarm"); } catch (_) { await new Promise((r) => setTimeout(r, 800)); }
     }
     if (!data) {
       sent = false;
@@ -192,7 +236,6 @@
       show("error");
       return;
     }
-    if (data.bot) bot = data.bot;
     haptic("notificationOccurred", "success");
     $("doneText").textContent = data.repeatMinutes
       ? "Сигнал близким уже был отправлен " + data.repeatMinutes + " мин назад. В чате можно отправить его ещё раз."
@@ -203,34 +246,6 @@
     setTimeout(openChat, 2500);
   }
 
-  // ── Иконка на рабочем столе ──────────────────────────────────────
-  function note(text) { $("setupNote").textContent = text; $("setupNote").hidden = false; }
-
-  function showSetup() {
-    show("setup");
-    if (!supports("8.0")) {
-      $("addHome").hidden = true;
-      note("Эта версия Telegram не умеет добавлять иконки на рабочий стол. Обнови Telegram и попробуй снова.");
-      return;
-    }
-    tg.checkHomeScreenStatus((status) => {
-      if (status === "added") note("✅ Иконка уже на рабочем столе.");
-      if (status === "unsupported") {
-        $("addHome").hidden = true;
-        note("На этом устройстве Telegram пока не умеет добавлять иконки. Закрепи чат с ботом вверху списка — так SOS будет в два нажатия.");
-      }
-    });
-  }
-
-  if (tg) {
-    tg.onEvent("homeScreenAdded", () => {
-      haptic("notificationOccurred", "success");
-      note("✅ Готово! Иконка SOS на рабочем столе. Нажатие на неё запустит отсчёт и отправит сигнал близким.");
-      $("addHome").hidden = true;
-    });
-  }
-
-  // ── Кнопки ───────────────────────────────────────────────────────
   $("ring").onclick = sendAlarm;
   $("cancel").onclick = () => { stopTimer(); haptic("impactOccurred", "light"); show("cancelled"); };
   $("sendNow").onclick = sendAlarm;
@@ -238,10 +253,184 @@
   $("openChat").onclick = openChat;
   $("openChat2").onclick = openChat;
   $("close").onclick = () => tg.close();
-  $("setupClose").onclick = () => tg.close();
-  $("addHome").onclick = () => tg.addToHomeScreen();
 
-  // ── Старт ────────────────────────────────────────────────────────
+  // ═══ Настройка ══════════════════════════════════════════════════
+  // mode: "onboard" — все шаги; "invite" — только близкие; "setup" — только иконка.
+
+  let mode = "onboard";
+  let state = { supporters: [], invitesSent: 0, iconAdded: false, hasPhone: false };
+  let poll = null;
+
+  async function refresh() {
+    const s = await quiet("state", { mode });
+    if (!s) return;
+    const joined = s.supporters.length > state.supporters.length && state.supporters.length > 0;
+    state = s;
+    renderPeople();
+    if (joined) haptic("notificationOccurred", "success");
+  }
+
+  // ── Шаг 1: зависимость ──
+  document.querySelectorAll("[data-addiction]").forEach((b) => {
+    b.onclick = () => { haptic("impactOccurred", "medium"); quiet("addiction", { value: b.dataset.addiction }); goPeople(); };
+  });
+  $("addSkip").onclick = () => goPeople();
+
+  // ── Шаг 2: близкие ──
+  function renderPeople() {
+    const rows = state.supporters.map((n) => "<div>💚 <b>" + esc(n) + "</b> — рядом</div>");
+    const waiting = state.invitesSent - state.supporters.length;
+    if (waiting > 0) rows.push("<div class=\"muted\">⏳ Ждём ответа на приглашение — откроют, и здесь появится имя</div>");
+    $("peopleList").innerHTML = rows.join("");
+    $("invite").textContent = state.supporters.length ? "➕ Позвать ещё одного" : "💚 Позвать близкого";
+    if (mode === "invite") $("peopleNext").textContent = "Готово";
+    else $("peopleNext").textContent = state.supporters.length || state.invitesSent ? "Дальше →" : "Пропустить пока";
+  }
+
+  function goPeople() {
+    show("obPeople");
+    if (mode === "invite") $("peopleSteps").hidden = true;
+    renderPeople();
+    if (!poll) poll = setInterval(refresh, 3000); // имя появится, как только человек нажмёт «Старт»
+  }
+
+  function stopPoll() { if (poll) clearInterval(poll); poll = null; }
+
+  function inviteSent() {
+    haptic("notificationOccurred", "success");
+    state.invitesSent += 1;
+    quiet("invite_sent");
+    renderPeople();
+  }
+
+  $("invite").onclick = async () => {
+    $("invite").disabled = true;
+    try {
+      const inv = await api("invite");
+      if (inv.preparedId && supports("8.0")) {
+        tg.shareMessage(inv.preparedId, (ok) => { if (ok) inviteSent(); });
+      } else {
+        // Запасной путь: обычное окно «Поделиться» со ссылкой.
+        tg.openTelegramLink("https://t.me/share/url?url=" + encodeURIComponent(inv.link) + "&text=" + encodeURIComponent(inv.shareText));
+        inviteSent();
+      }
+    } catch (_) {
+      haptic("notificationOccurred", "error");
+    } finally {
+      $("invite").disabled = false;
+    }
+  };
+
+  $("peopleNext").onclick = () => {
+    stopPoll();
+    if (mode === "invite") { tg.close(); return; }
+    goIcon();
+  };
+
+  // ── Шаг 3: иконка ──
+  function iconNote(text) { $("iconNote").textContent = text; $("iconNote").hidden = false; }
+
+  function markIconAdded() {
+    state.iconAdded = true;
+    quiet("icon_added");
+  }
+
+  function goIcon() {
+    show("obIcon");
+    if (mode === "setup") document.querySelector("#obIcon .steps").hidden = true;
+    $("iconNext").textContent = mode === "setup" ? "Закрыть" : "Пропустить";
+    if (!supports("8.0")) {
+      $("iconAdd").hidden = true;
+      iconNote("Эта версия Telegram не умеет добавлять иконки. Обнови Telegram и открой настройку снова: /setup");
+      $("iconNext").textContent = mode === "setup" ? "Закрыть" : "Дальше →";
+      return;
+    }
+    tg.checkHomeScreenStatus((status) => {
+      if (status === "added") {
+        markIconAdded();
+        iconNote("✅ Иконка уже на рабочем столе.");
+        $("iconAdd").hidden = true;
+        $("iconNext").textContent = mode === "setup" ? "Закрыть" : "Дальше →";
+      }
+      if (status === "unsupported") {
+        $("iconAdd").hidden = true;
+        iconNote("На этом устройстве Telegram пока не умеет добавлять иконки. Закрепи чат с ботом вверху списка — так SOS будет в два нажатия.");
+        $("iconNext").textContent = mode === "setup" ? "Закрыть" : "Дальше →";
+      }
+    });
+  }
+
+  $("iconAdd").onclick = () => tg.addToHomeScreen();
+  $("iconNext").onclick = () => (mode === "setup" ? tg.close() : goDone());
+
+  if (tg) {
+    tg.onEvent("homeScreenAdded", () => {
+      haptic("notificationOccurred", "success");
+      markIconAdded();
+      iconNote("✅ Готово! Иконка SOS на рабочем столе.");
+      $("iconAdd").hidden = true;
+      if (mode === "onboard") setTimeout(goDone, 1200);
+      else $("iconNext").textContent = "Закрыть";
+    });
+  }
+
+  // ── Готово ──
+  function doneNote(text) { $("doneNote").textContent = text; $("doneNote").hidden = false; }
+
+  function goDone() {
+    show("obDone");
+    quiet("finish");
+    const rows = [];
+    if (state.supporters.length) rows.push("<div>💚 Рядом: <b>" + state.supporters.map(esc).join(", ") + "</b></div>");
+    else if (state.invitesSent) rows.push("<div>⏳ Ждём ответа на приглашение — бот напишет, когда его примут</div>");
+    else rows.push("<div class=\"muted\">Близких пока нет — позвать можно позже: /setup</div>");
+    rows.push(state.iconAdded ? "<div>📲 Иконка SOS на рабочем столе</div>" : "<div class=\"muted\">Иконку можно добавить позже: /icon</div>");
+    rows.push("<div>🆘 Красная кнопка в чате работает всегда</div>");
+    $("summary").innerHTML = rows.join("");
+    $("test").hidden = state.supporters.length === 0;
+    $("phone").hidden = state.hasPhone || !supports("6.9");
+  }
+
+  $("test").onclick = async () => {
+    $("test").disabled = true;
+    const r = await quiet("test_alarm");
+    if (r) {
+      haptic("notificationOccurred", "success");
+      $("test").textContent = "✅ Тренировка отправлена: " + r.sent;
+      doneNote("Близкие получили пример сигнала с пометкой «тренировка». Когда они нажмут «Вижу», бот напишет тебе.");
+    } else {
+      $("test").disabled = false;
+    }
+  };
+
+  $("phone").onclick = () => {
+    tg.requestContact((ok) => {
+      if (ok) {
+        $("phone").hidden = true;
+        doneNote("📱 Номер сохранён — он будет в сигнале, и близкие смогут сразу позвонить.");
+      }
+    });
+  };
+
+  $("obClose").onclick = () => tg.close();
+
+  async function startOnboarding() {
+    show("sending");
+    document.querySelector("#sending h1").textContent = "Загружаю…";
+    const s = await quiet("state", { mode });
+    if (s) state = s;
+    // Пришли по ссылке, ни разу не нажав «Старт»: без разрешения бот не сможет прислать шаги в трудную минуту.
+    if (s && !s.started && supports("6.9")) {
+      tg.requestWriteAccess((granted) => { if (granted) quiet("write_access"); });
+    }
+    if (mode === "invite") goPeople();
+    else if (mode === "setup") goIcon();
+    else if (state.addiction) goPeople();
+    else show("obAddiction");
+  }
+
+  // ═══ Старт ══════════════════════════════════════════════════════
+
   if (!tg || !tg.initData) {
     show("error");
     document.querySelector("#error h1").textContent = "Открой SOS из Telegram";
@@ -251,8 +440,13 @@
     tg.expand();
     try { tg.setHeaderColor("#ff3b30"); tg.setBackgroundColor("#d50000"); tg.setBottomBarColor && tg.setBottomBarColor("#d50000"); } catch (_) {}
     try { tg.disableVerticalSwipes(); } catch (_) {}
-    if (tg.initDataUnsafe && tg.initDataUnsafe.start_param === "setup") showSetup();
-    else startCountdown();
+    const param = tg.initDataUnsafe && tg.initDataUnsafe.start_param;
+    if (param === "onboard" || param === "invite" || param === "setup") {
+      mode = param;
+      startOnboarding();
+    } else {
+      startCountdown();
+    }
   }
 </script>
 </body>
