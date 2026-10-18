@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>SOS</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --red: #d50000;
+    --red-top: #ff3b30;
+    --white: #ffffff;
+    --soft: rgba(255, 255, 255, 0.82);
+    --line: rgba(255, 255, 255, 0.35);
+    --pad-top: max(env(safe-area-inset-top), var(--tg-content-safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px));
+    --pad-bottom: max(env(safe-area-inset-bottom), var(--tg-safe-area-inset-bottom, 0px));
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: linear-gradient(180deg, var(--red-top), var(--red));
+    color: var(--white);
+    font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: var(--tg-viewport-stable-height, 100vh);
+    user-select: none;
+  }
+  .screen {
+    display: none;
+    min-height: var(--tg-viewport-stable-height, 100vh);
+    padding: calc(var(--pad-top) + 24px) 20px calc(var(--pad-bottom) + 24px);
+    flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+    text-align: center;
+  }
+  .screen.on { display: flex; }
+  h1 { font-size: 26px; line-height: 1.25; margin: 0; font-weight: 800; }
+  p { margin: 0; color: var(--soft); max-width: 340px; }
+  .ring { position: relative; width: 240px; height: 240px; border: none; background: none; padding: 0; color: inherit; cursor: pointer; }
+  .ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 12; }
+  .ring .track { stroke: var(--line); }
+  .ring .bar { stroke: var(--white); stroke-linecap: round; stroke-dasharray: 691; stroke-dashoffset: 0; }
+  .ring .bar.run { transition: stroke-dashoffset 3s linear; stroke-dashoffset: 691; }
+  .ring .num { position: absolute; inset: 0; display: grid; place-items: center; font-size: 112px; font-weight: 800; }
+  .btn {
+    width: 100%; max-width: 360px; min-height: 64px; border-radius: 18px; border: 0;
+    font: inherit; font-size: 20px; font-weight: 700; cursor: pointer;
+  }
+  .btn.white { background: var(--white); color: var(--red); }
+  .btn.ghost { background: transparent; color: var(--white); border: 2px solid var(--white); }
+  .btn.small { min-height: 52px; font-size: 17px; font-weight: 600; }
+  .stack { display: flex; flex-direction: column; gap: 12px; width: 100%; align-items: center; }
+  .big { font-size: 72px; line-height: 1; }
+  .hot { background: rgba(0, 0, 0, 0.18); border-radius: 16px; padding: 14px 16px; text-align: left; max-width: 360px; width: 100%; }
+  .hot a { color: var(--white); font-weight: 700; text-decoration: none; }
+  .hot div + div { margin-top: 8px; }
+  .spinner { width: 56px; height: 56px; border-radius: 50%; border: 6px solid var(--line); border-top-color: var(--white); animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .ring .bar.run { transition: none; } .spinner { animation-duration: 2s; } }
+</style>
+</head>
+<body>
+
+<!-- Отсчёт -->
+<section class="screen" id="countdown">
+  <h1>Сигнал близким уйдёт через</h1>
+  <button class="ring" id="ring" aria-label="Отправить сейчас">
+    <svg viewBox="0 0 240 240"><circle class="track" cx="120" cy="120" r="110"/><circle class="bar" id="bar" cx="120" cy="120" r="110"/></svg>
+    <span class="num" id="num">3</span>
+  </button>
+  <p>Нажми на круг, чтобы отправить сразу</p>
+  <button class="btn ghost" id="cancel">Отменить</button>
+</section>
+
+<!-- Отправка -->
+<section class="screen" id="sending">
+  <div class="spinner" aria-hidden="true"></div>
+  <h1>Отправляю сигнал…</h1>
+</section>
+
+<!-- Готово -->
+<section class="screen" id="done">
+  <div class="big">✅</div>
+  <h1>Ты не один на один с этим</h1>
+  <p id="doneText"></p>
+  <p>Сейчас откроется чат — там шаги, как продержаться ближайшие минуты.</p>
+  <button class="btn white" id="openChat">Открыть шаги</button>
+</section>
+
+<!-- Ошибка -->
+<section class="screen" id="error">
+  <h1>Не получилось отправить сигнал</h1>
+  <p>Нажми красную кнопку 🆘 в чате с ботом или позвони:</p>
+  <div class="hot">
+    <div><a href="tel:112">112</a> — если есть угроза жизни</div>
+    <div><a href="tel:+74959895050">+7 495 989-50-50</a> — телефон доверия МЧС, круглосуточно, бесплатно</div>
+  </div>
+  <div class="stack">
+    <button class="btn white" id="retry">Попробовать ещё раз</button>
+    <button class="btn ghost small" id="openChat2">Открыть чат</button>
+  </div>
+</section>
+
+<!-- Отменено -->
+<section class="screen" id="cancelled">
+  <h1>Отменено</h1>
+  <p>Если всё-таки тяжело — отправь сигнал. Лишний сигнал лучше срыва.</p>
+  <div class="stack">
+    <button class="btn white" id="sendNow">🆘 Отправить сигнал</button>
+    <button class="btn ghost small" id="close">Закрыть</button>
+  </div>
+</section>
+
+<!-- Иконка на рабочий стол -->
+<section class="screen" id="setup">
+  <div class="big">📲</div>
+  <h1>Кнопка SOS на рабочем столе</h1>
+  <p>Иконка появится рядом с другими приложениями. Одно нажатие — отсчёт 3 секунды — и близкие получают сигнал. Если нажато случайно, можно отменить.</p>
+  <p id="setupNote" hidden></p>
+  <div class="stack">
+    <button class="btn white" id="addHome">Добавить на рабочий стол</button>
+    <button class="btn ghost small" id="setupClose">Закрыть</button>
+  </div>
+</section>
+
+<script>
+  // Адрес функции бота в Supabase.
+  const API = "https://qbpfdvmthpjexmbhtxwl.supabase.co/functions/v1/sos-bot?action=webapp";
+  let bot = "notbreak_bot";
+
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const $ = (id) => document.getElementById(id);
+  const show = (id) => document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("on", s.id === id));
+  const haptic = (kind, arg) => { try { tg.HapticFeedback[kind](arg); } catch (_) {} };
+  const supports = (v) => !!tg && tg.isVersionAtLeast && tg.isVersionAtLeast(v);
+
+  function openChat() {
+    try { tg.openTelegramLink("https://t.me/" + bot); } catch (_) {}
+    setTimeout(() => { try { tg.close(); } catch (_) {} }, 400);
+  }
+
+  // ── Отсчёт ───────────────────────────────────────────────────────
+  let timer = null;
+  let sent = false;
+
+  function startCountdown() {
+    show("countdown");
+    let left = 3;
+    $("num").textContent = left;
+    haptic("impactOccurred", "heavy");
+    requestAnimationFrame(() => requestAnimationFrame(() => $("bar").classList.add("run")));
+    timer = setInterval(() => {
+      left -= 1;
+      if (left > 0) {
+        $("num").textContent = left;
+        haptic("impactOccurred", "heavy");
+      } else {
+        stopTimer();
+        sendAlarm();
+      }
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timer) clearInterval(timer);
+    timer = null;
+  }
+
+  // ── Отправка ─────────────────────────────────────────────────────
+  async function post() {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: JSON.stringify({ initData: tg.initData }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "failed");
+    return data;
+  }
+
+  async function sendAlarm() {
+    if (sent) return;
+    sent = true;
+    stopTimer();
+    show("sending");
+    let data = null;
+    for (let attempt = 0; attempt < 3 && !data; attempt++) {
+      try { data = await post(); } catch (_) { await new Promise((r) => setTimeout(r, 800)); }
+    }
+    if (!data) {
+      sent = false;
+      haptic("notificationOccurred", "error");
+      show("error");
+      return;
+    }
+    if (data.bot) bot = data.bot;
+    haptic("notificationOccurred", "success");
+    $("doneText").textContent = data.repeatMinutes
+      ? "Сигнал близким уже был отправлен " + data.repeatMinutes + " мин назад. В чате можно отправить его ещё раз."
+      : data.sent > 0
+      ? "Сигнал отправлен. Получили близких: " + data.sent + ". Кто-то из них скоро выйдет на связь."
+      : "Близких в списке пока нет, поэтому сигнал некому отправить. В чате — номера, по которым ответят прямо сейчас.";
+    show("done");
+    setTimeout(openChat, 2500);
+  }
+
+  // ── Иконка на рабочем столе ──────────────────────────────────────
+  function note(text) { $("setupNote").textContent = text; $("setupNote").hidden = false; }
+
+  function showSetup() {
+    show("setup");
+    if (!supports("8.0")) {
+      $("addHome").hidden = true;
+      note("Эта версия Telegram не умеет добавлять иконки на рабочий стол. Обнови Telegram и попробуй снова.");
+      return;
+    }
+    tg.checkHomeScreenStatus((status) => {
+      if (status === "added") note("✅ Иконка уже на рабочем столе.");
+      if (status === "unsupported") {
+        $("addHome").hidden = true;
+        note("На этом устройстве Telegram пока не умеет добавлять иконки. Закрепи чат с ботом вверху списка — так SOS будет в два нажатия.");
+      }
+    });
+  }
+
+  if (tg) {
+    tg.onEvent("homeScreenAdded", () => {
+      haptic("notificationOccurred", "success");
+      note("✅ Готово! Иконка SOS на рабочем столе. Нажатие на неё запустит отсчёт и отправит сигнал близким.");
+      $("addHome").hidden = true;
+    });
+  }
+
+  // ── Кнопки ───────────────────────────────────────────────────────
+  $("ring").onclick = sendAlarm;
+  $("cancel").onclick = () => { stopTimer(); haptic("impactOccurred", "light"); show("cancelled"); };
+  $("sendNow").onclick = sendAlarm;
+  $("retry").onclick = sendAlarm;
+  $("openChat").onclick = openChat;
+  $("openChat2").onclick = openChat;
+  $("close").onclick = () => tg.close();
+  $("setupClose").onclick = () => tg.close();
+  $("addHome").onclick = () => tg.addToHomeScreen();
+
+  // ── Старт ────────────────────────────────────────────────────────
+  if (!tg || !tg.initData) {
+    show("error");
+    document.querySelector("#error h1").textContent = "Открой SOS из Telegram";
+    $("retry").hidden = true;
+  } else {
+    tg.ready();
+    tg.expand();
+    try { tg.setHeaderColor("#ff3b30"); tg.setBackgroundColor("#d50000"); tg.setBottomBarColor && tg.setBottomBarColor("#d50000"); } catch (_) {}
+    try { tg.disableVerticalSwipes(); } catch (_) {}
+    if (tg.initDataUnsafe && tg.initDataUnsafe.start_param === "setup") showSetup();
+    else startCountdown();
+  }
+</script>
+</body>
+</html>
