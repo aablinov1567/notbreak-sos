@@ -35,12 +35,12 @@
   .screen.on { display: flex; }
   h1 { font-size: 26px; line-height: 1.25; margin: 0; font-weight: 800; }
   p { margin: 0; color: var(--soft); max-width: 340px; }
-  .ring { position: relative; width: 240px; height: 240px; border: none; background: none; padding: 0; color: inherit; cursor: pointer; }
+  .ring { position: relative; width: 220px; height: 220px; pointer-events: none; }
   .ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
   .ring circle { fill: none; stroke-width: 12; }
   .ring .track { stroke: var(--line); }
   .ring .bar { stroke: var(--white); stroke-linecap: round; stroke-dasharray: 691; stroke-dashoffset: 0; }
-  .ring .bar.run { transition: stroke-dashoffset 3s linear; stroke-dashoffset: 691; }
+  .ring .bar.run { transition: stroke-dashoffset 5s linear; stroke-dashoffset: 691; }
   .ring .num { position: absolute; inset: 0; display: grid; place-items: center; font-size: 112px; font-weight: 800; }
   .btn {
     width: 100%; max-width: 360px; min-height: 64px; border-radius: 18px; border: 0;
@@ -49,6 +49,9 @@
   .btn.white { background: var(--white); color: var(--red); }
   .btn.ghost { background: transparent; color: var(--white); border: 2px solid var(--white); }
   .btn.small { min-height: 52px; font-size: 17px; font-weight: 600; }
+  .btn.huge { min-height: 96px; font-size: 26px; font-weight: 800; border-radius: 24px; }
+  .later { margin-top: 48px; }
+  .ring svg { width: 100%; height: 100%; }
   .btn:disabled { opacity: 0.6; }
   .stack { display: flex; flex-direction: column; gap: 12px; width: 100%; align-items: center; }
   .big { font-size: 72px; line-height: 1; }
@@ -72,12 +75,13 @@
 
 <section class="screen" id="countdown">
   <h1>Сигнал близким уйдёт через</h1>
-  <button class="ring" id="ring" aria-label="Отправить сейчас">
+  <!-- Круг — только индикатор: нажатие на него ничего не делает, чтобы случайное касание не отправило сигнал. -->
+  <div class="ring" aria-hidden="true">
     <svg viewBox="0 0 240 240"><circle class="track" cx="120" cy="120" r="110"/><circle class="bar" id="bar" cx="120" cy="120" r="110"/></svg>
-    <span class="num" id="num">3</span>
-  </button>
-  <p>Нажми на круг, чтобы отправить сразу</p>
-  <button class="btn ghost" id="cancel">Отменить</button>
+    <span class="num" id="num">5</span>
+  </div>
+  <p>Нажато случайно? Отмени — сигнал не уйдёт.</p>
+  <button class="btn white huge" id="cancel">Отменить</button>
 </section>
 
 <section class="screen" id="sending">
@@ -107,11 +111,15 @@
 </section>
 
 <section class="screen" id="cancelled">
-  <h1>Отменено</h1>
-  <p>Если всё-таки тяжело — отправь сигнал. Лишний сигнал лучше срыва.</p>
+  <div class="big">✋</div>
+  <h1>Отменено. Сигнал никому не ушёл.</h1>
   <div class="stack">
-    <button class="btn white" id="sendNow">🆘 Отправить сигнал</button>
-    <button class="btn ghost small" id="close">Закрыть</button>
+    <button class="btn white" id="close">Закрыть</button>
+  </div>
+  <!-- Отправка — внизу, мелко и не сразу: повторное касание по центру не должно её нажать. -->
+  <div class="stack later">
+    <p>Если всё-таки тяжело — лишний сигнал лучше срыва.</p>
+    <button class="btn ghost small" id="sendNow" disabled>🆘 Всё-таки отправить</button>
   </div>
 </section>
 
@@ -143,7 +151,7 @@
   <div class="steps"><i class="on"></i><i class="on"></i><i class="on"></i>&nbsp;Шаг 3 из 3</div>
   <div class="big">📲</div>
   <h1>Кнопка SOS на рабочем столе</h1>
-  <p>Одно нажатие на иконку — отсчёт 3 секунды — и близкие получают сигнал. Случайное нажатие можно отменить.</p>
+  <p>Одно нажатие на иконку — отсчёт 5 секунд — и близкие получают сигнал. Случайное нажатие можно отменить.</p>
   <p class="note" id="iconNote" hidden></p>
   <div class="stack">
     <button class="btn white" id="iconAdd">Добавить на рабочий стол</button>
@@ -170,7 +178,14 @@
 
   const tg = window.Telegram && window.Telegram.WebApp;
   const $ = (id) => document.getElementById(id);
-  const show = (id) => document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("on", s.id === id));
+  // После смены экрана 0,7 с игнорируем нажатия: палец, который нажал кнопку на прошлом экране,
+  // не должен «провалиться» в кнопку, оказавшуюся на том же месте на новом.
+  let tapGuardUntil = 0;
+  const show = (id) => {
+    tapGuardUntil = Date.now() + 700;
+    document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("on", s.id === id));
+  };
+  const onTap = (id, fn) => { $(id).onclick = () => { if (Date.now() >= tapGuardUntil) fn(); }; };
   const haptic = (kind, arg) => { try { tg.HapticFeedback[kind](arg); } catch (_) {} };
   const supports = (v) => !!tg && tg.isVersionAtLeast && tg.isVersionAtLeast(v);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -195,12 +210,15 @@
 
   // ═══ Тревога с иконки ═══════════════════════════════════════════
 
+  const COUNTDOWN_SEC = 5;
   let timer = null;
   let sent = false;
+  let cancelled = false;
 
   function startCountdown() {
     show("countdown");
-    let left = 3;
+    tapGuardUntil = 0; // «Отменить» должно работать с первой же секунды
+    let left = COUNTDOWN_SEC;
     $("num").textContent = left;
     haptic("impactOccurred", "heavy");
     requestAnimationFrame(() => requestAnimationFrame(() => $("bar").classList.add("run")));
@@ -211,9 +229,19 @@
         haptic("impactOccurred", "heavy");
       } else {
         stopTimer();
-        sendAlarm();
+        if (!cancelled) sendAlarm();
       }
     }, 1000);
+  }
+
+  function cancelCountdown() {
+    cancelled = true;
+    stopTimer();
+    haptic("impactOccurred", "light");
+    show("cancelled");
+    // «Всё-таки отправить» включается не сразу — чтобы не нажать его тем же движением пальца.
+    $("sendNow").disabled = true;
+    setTimeout(() => { $("sendNow").disabled = false; }, 2000);
   }
 
   function stopTimer() {
@@ -246,13 +274,12 @@
     setTimeout(openChat, 2500);
   }
 
-  $("ring").onclick = sendAlarm;
-  $("cancel").onclick = () => { stopTimer(); haptic("impactOccurred", "light"); show("cancelled"); };
-  $("sendNow").onclick = sendAlarm;
-  $("retry").onclick = sendAlarm;
-  $("openChat").onclick = openChat;
-  $("openChat2").onclick = openChat;
-  $("close").onclick = () => tg.close();
+  $("cancel").onclick = cancelCountdown; // без защиты от касаний: отмена должна срабатывать всегда
+  onTap("sendNow", sendAlarm);
+  onTap("retry", sendAlarm);
+  onTap("openChat", openChat);
+  onTap("openChat2", openChat);
+  onTap("close", () => tg.close());
 
   // ═══ Настройка ══════════════════════════════════════════════════
   // mode: "onboard" — все шаги; "invite" — только близкие; "setup" — только иконка.
